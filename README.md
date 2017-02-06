@@ -30,6 +30,9 @@ Code references:
   on stackoverflow https://stackoverflow.com/questions/27745/getting-parts-of-a-url-regex
   License: CC-BY-SA 3.0
 
+* Re: recvall function - how to get to avoid it hanging for certain requests.
+  eClass forum discussion on "Assignment 2 Redirects"
+  
 
 Python Library references:
 
@@ -45,17 +48,3 @@ Python Library references:
   Title: 20.5. urllib - open arbitrary resources by URL
   URL: https://docs.python.org/2/library/urllib.html
 
-Note regarding recvall function
-===============================
-
-This function hangs if using HTTP/1.1 for certain requests. For example:
-
-python2 httpclient.py GET "www.adasteam.ca/" hangs for HTTP/1.1 request likey because
-the "Connection: close" header is not included in the response from www.adasteam.ca
-
-python2 httpclient.py GET "www.adasteam.ca/" works as expected for HTTP/1.0 request
-as the "Connection: close" header is include in the response from www.adasteam.ca
-
-This was discovered after reading the 404 eclass post "Assignment 2 Redirects"
-
-To avoid this issue, the status line of requests is now set to HTTP/1.0 rather than HTTP/1.1

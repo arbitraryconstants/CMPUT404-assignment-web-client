@@ -84,6 +84,7 @@ class HTTPClient(object):
             headers = "User-Agent: " +  user_agent + "\r\n" + \
                       "Host: " + host + "\r\n" + \
                       "Accept: */* \r\n" + \
+                      "Connection: close" + "\r\n" + \
                       "\r\n"
             
         if method == "POST":
@@ -94,6 +95,7 @@ class HTTPClient(object):
                           "Accept: */* \r\n" + \
                           "Content-Length: " + str(content_length) + "\r\n" + \
                           "Content-Type: " + content_type + "\r\n" + \
+                          "Connection: close" + "\r\n" + \
                           "\r\n"
             else:
                 headers = "User-Agent: " +  user_agent + "\r\n" + \
@@ -101,6 +103,7 @@ class HTTPClient(object):
                           "Accept: */* \r\n" + \
                           "Content-Length: " + '0' + "\r\n" + \
                           "Content-Type: " + content_type + "\r\n" + \
+                          "Connection: close" + "\r\n" + \
                           "\r\n"
             
         return headers
@@ -123,17 +126,10 @@ class HTTPClient(object):
     
     # Read everything from the socket
     '''
-    Note: this function hangs if using HTTP/1.1 for certain requests. For example:
-
-    python2 httpclient.py GET "www.adasteam.ca/" hangs for HTTP/1.1 request likey because
-    the "Connection: close" header is not included in the response from www.adasteam.ca
-
-    python2 httpclient.py GET "www.adasteam.ca/" works as expected for HTTP/1.0 request
-    as the "Connection: close" header is include in the response from www.adasteam.ca
+    Note: this function hangs if using HTTP/1.1 for certain requests, if you
+    do not include the  "Connection: close" header in the request. 
 
     This was discovered after reading the 404 eclass post "Assignment 2 Redirects"
-
-    To avoid this issue, the status line of requests is now set to HTTP/1.0 rather than HTTP/1.1
     '''
     def recvall(self, sock):
         buffer = bytearray()
@@ -161,9 +157,9 @@ class HTTPClient(object):
         client_socket = self.connect(host, port)
         
         if query:
-            status_line = "GET" + " " + path + query + " HTTP/1.0\r\n"
+            status_line = "GET" + " " + path + query + " HTTP/1.1\r\n"
         else:
-            status_line = "GET" + " " + path + " HTTP/1.0\r\n"
+            status_line = "GET" + " " + path + " HTTP/1.1\r\n"
             
         headers = self.get_headers(method, path, user_agent, host)
         request = status_line + headers
@@ -197,9 +193,9 @@ class HTTPClient(object):
         client_socket = self.connect(host, port)
        
         if query:
-            status_line = "POST" + " " + path + query + " HTTP/1.0\r\n"
+            status_line = "POST" + " " + path + query + " HTTP/1.1\r\n"
         else:
-            status_line = "POST" + " " + path + " HTTP/1.0\r\n"
+            status_line = "POST" + " " + path + " HTTP/1.1\r\n"
         
         headers = self.get_headers(method, path, user_agent, host, content)
         
