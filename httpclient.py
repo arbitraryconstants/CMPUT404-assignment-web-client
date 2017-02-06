@@ -21,34 +21,108 @@
 import sys
 import socket
 import re
-# you may use urllib to encode data appropriately
 import urllib
+import json
 
 def help():
     print "httpclient.py [GET/POST] [URL]\n"
 
 class HTTPResponse(object):
+    
     def __init__(self, code=200, body=""):
         self.code = code
         self.body = body
 
+        
 class HTTPClient(object):
-    #def get_host_port(self,url):
+
+    
+    def parse_url(self, url):
+        # By okigan (https://stackoverflow.com/users/142207/okigan) on stackoverflow:
+        # https://stackoverflow.com/questions/27745/getting-parts-of-a-url-regex
+        pattern = (r'^'
+               r'((?P<schema>.+?)://)?'
+               r'((?P<user>.+?)(:(?P<password>.*?))?@)?'
+               r'(?P<host>.*?)'
+               r'(:(?P<port>\d+?))?'
+               r'(?P<path>/.*?)?'
+               r'(?P<query>[?].*?)?'
+               r'$'
+               )
+        regex = re.compile(pattern)
+        m = regex.match(url)
+        self.url_dictionary = m.groupdict() if m is not None else None
+
+        if not self.url_dictionary["path"]:
+            self.url_dictionary["path"] = "/"
+            
+    
+    def get_host_port(self, url):
+        host = self.url_dictionary["host"]
+        port = self.url_dictionary["port"]
+       
+        if not port:
+            port = 80
+        port = int(port)
+        
+        return host, port
+   
 
     def connect(self, host, port):
-        # use sockets!
-        return None
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        return client_socket
 
-    def get_code(self, data):
-        return None
+    
+    def get_code(self, response):
+        code = int(response.split()[1])
+        return code
+       
+        
+    def get_headers(self, method, path, user_agent, host, content=None, content_type="application/x-www-form-urlencoded"):
+        
+        if method == "GET":
+            headers = "User-Agent: " +  user_agent + "\r\n" + \
+                      "Host: " + host + "\r\n" + \
+                      "Accept: */* \r\n" + \
+                      "\r\n"
+            
+        if method == "POST":
+            if content:
+                content_length = len(content)
+                headers = "User-Agent: " +  user_agent + "\r\n" + \
+                          "Host: " + host + "\r\n" + \
+                          "Accept: */* \r\n" + \
+                          "Content-Length: " + str(content_length) + "\r\n" + \
+                          "Content-Type: " + content_type + "\r\n" + \
+                          "\r\n"
+            else:
+                headers = "User-Agent: " +  user_agent + "\r\n" + \
+                          "Host: " + host + "\r\n" + \
+                          "Accept: */* \r\n" + \
+                          "Content-Length: " + '0' + "\r\n" + \
+                          "Content-Type: " + content_type + "\r\n" + \
+                          "\r\n"
+            
+        return headers
 
-    def get_headers(self,data):
-        return None
+    
+    def get_body(self, response):
+        try:
+            body = response.split("\r\n\r\n")[1]
+            return body
+        except:
+            return ""
+       
 
-    def get_body(self, data):
-        return None
+    def get_content(self, args):
+        if not args:
+            return None
+        content = urllib.urlencode(args)
+        return content
 
-    # read everything from the socket
+    
+    # Read everything from the socket
     def recvall(self, sock):
         buffer = bytearray()
         done = False
@@ -60,22 +134,83 @@ class HTTPClient(object):
                 done = not part
         return str(buffer)
 
+    
     def GET(self, url, args=None):
-        code = 500
-        body = ""
+        self.parse_url(url)
+        method = "GET"
+        host, port = self.get_host_port(url)
+        path = self.url_dictionary["path"]
+        user_agent = "curl/7.43.0"
+        client_socket = self.connect(host, port)
+        
+        query = self.url_dictionary["query"]
+        if query:
+            status_line = "GET" + " " + path + query + " HTTP/1.1\r\n"
+        else:
+            status_line = "GET" + " " + path + " HTTP/1.1\r\n"
+            
+        headers = self.get_headers(method, path, user_agent, host)
+        request = status_line + headers
+        print ""
+        print "----------GET REQUEST-----------"
+        print request
+        client_socket.sendall(request)
+
+        response = self.recvall(client_socket)
+        print ""
+        print "----------HTTP RESPONSE----------"
+        print response
+        code = self.get_code(response)
+        body = self.get_body(response)
+
         return HTTPResponse(code, body)
+
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+        self.parse_url(url)
+        method = "POST"
+        host, port = self.get_host_port(url)
+        path = self.url_dictionary["path"]
+        user_agent = "curl/7.43.0"
+        
+        client_socket = self.connect(host, port)
+        query = self.url_dictionary["query"]
+        if query:
+            status_line = "GET" + " " + path + query + " HTTP/1.1\r\n"
+        else:
+            status_line = "GET" + " " + path + " HTTP/1.1\r\n"
 
+        status_line = "POST" + " " + path + " HTTP/1.1\r\n"
+        content = self.get_content(args)
+        headers = self.get_headers(method, path, user_agent, host, content)
+        
+        if content:
+            request = status_line + headers + content
+        else:
+            request = status_line + headers
+
+        print ""
+        print "----------POST REQUEST-----------"
+        print request
+        client_socket.sendall(request)
+
+        response = self.recvall(client_socket)
+        print ""
+        print "----------HTTP RESPONSE----------"
+        print response
+        code = self.get_code(response)
+        body = self.get_body(response)
+        
+        return HTTPResponse(code, body)    
+
+   
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
             return self.POST( url, args )
         else:
             return self.GET( url, args )
-    
+
+
 if __name__ == "__main__":
     client = HTTPClient()
     command = "GET"
@@ -84,5 +219,6 @@ if __name__ == "__main__":
         sys.exit(1)
     elif (len(sys.argv) == 3):
         print client.command( sys.argv[2], sys.argv[1] )
+    
     else:
         print client.command( sys.argv[1] )   
