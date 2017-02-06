@@ -39,9 +39,23 @@ Python Library references:
   Title: 17.2. socket - Low-level socket interface
   URL: https://docs.python.org/2/library/socket.html
 
-# Re: urllib library:
+* Re: urllib library:
   Author: Python Software Foundation
   Visit date: Feb 4th, 2017
   Title: 20.5. urllib - open arbitrary resources by URL
   URL: https://docs.python.org/2/library/urllib.html
 
+Note regarding recvall function
+===============================
+
+This function hangs if using HTTP/1.1 for certain requests. For example:
+
+python2 httpclient.py GET "www.adasteam.ca/" hangs for HTTP/1.1 request likey because
+the "Connection: close" header is not included in the response from www.adasteam.ca
+
+python2 httpclient.py GET "www.adasteam.ca/" works as expected for HTTP/1.0 request
+as the "Connection: close" header is include in the response from www.adasteam.ca
+
+This was discovered after reading the 404 eclass post "Assignment 2 Redirects"
+
+To avoid this issue, the status line of requests is now set to HTTP/1.0 rather than HTTP/1.1

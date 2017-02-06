@@ -57,15 +57,14 @@ class HTTPClient(object):
             self.url_dictionary["path"] = "/"
             
     
-    def get_host_port(self, url):
-        host = self.url_dictionary["host"]
+    def get_port(self, url):
         port = self.url_dictionary["port"]
-       
+
         if not port:
             port = 80
         port = int(port)
-        
-        return host, port
+    
+        return  port
    
 
     def connect(self, host, port):
@@ -123,6 +122,19 @@ class HTTPClient(object):
 
     
     # Read everything from the socket
+    '''
+    Note: this function hangs if using HTTP/1.1 for certain requests. For example:
+
+    python2 httpclient.py GET "www.adasteam.ca/" hangs for HTTP/1.1 request likey because
+    the "Connection: close" header is not included in the response from www.adasteam.ca
+
+    python2 httpclient.py GET "www.adasteam.ca/" works as expected for HTTP/1.0 request
+    as the "Connection: close" header is include in the response from www.adasteam.ca
+
+    This was discovered after reading the 404 eclass post "Assignment 2 Redirects"
+
+    To avoid this issue, the status line of requests is now set to HTTP/1.0 rather than HTTP/1.1
+    '''
     def recvall(self, sock):
         buffer = bytearray()
         done = False
@@ -136,18 +148,22 @@ class HTTPClient(object):
 
     
     def GET(self, url, args=None):
+
         self.parse_url(url)
+        
         method = "GET"
-        host, port = self.get_host_port(url)
-        path = self.url_dictionary["path"]
         user_agent = "curl/7.43.0"
+        host = self.url_dictionary["host"]
+        port = self.get_port(url)
+        path = self.url_dictionary["path"]
+        query = self.url_dictionary["query"]
+        
         client_socket = self.connect(host, port)
         
-        query = self.url_dictionary["query"]
         if query:
-            status_line = "GET" + " " + path + query + " HTTP/1.1\r\n"
+            status_line = "GET" + " " + path + query + " HTTP/1.0\r\n"
         else:
-            status_line = "GET" + " " + path + " HTTP/1.1\r\n"
+            status_line = "GET" + " " + path + " HTTP/1.0\r\n"
             
         headers = self.get_headers(method, path, user_agent, host)
         request = status_line + headers
@@ -167,21 +183,24 @@ class HTTPClient(object):
 
 
     def POST(self, url, args=None):
+        
         self.parse_url(url)
+
         method = "POST"
-        host, port = self.get_host_port(url)
-        path = self.url_dictionary["path"]
         user_agent = "curl/7.43.0"
+        host = self.url_dictionary["host"]
+        port = self.get_port(url)
+        path = self.url_dictionary["path"]
+        query = self.url_dictionary["query"]
+        content = self.get_content(args)
         
         client_socket = self.connect(host, port)
-        query = self.url_dictionary["query"]
+       
         if query:
-            status_line = "GET" + " " + path + query + " HTTP/1.1\r\n"
+            status_line = "POST" + " " + path + query + " HTTP/1.0\r\n"
         else:
-            status_line = "GET" + " " + path + " HTTP/1.1\r\n"
-
-        status_line = "POST" + " " + path + " HTTP/1.1\r\n"
-        content = self.get_content(args)
+            status_line = "POST" + " " + path + " HTTP/1.0\r\n"
+        
         headers = self.get_headers(method, path, user_agent, host, content)
         
         if content:
